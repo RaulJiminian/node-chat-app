@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import Filter from "bad-words";
+import { generateMessage, generateLocationMessage } from "./utils/messages.js";
 import * as path from "path";
 import * as url from "url";
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
@@ -18,8 +19,14 @@ app.use(express.static(publicDirectoryPath));
 io.on("connection", (socket) => {
   console.log("New WS Connection!");
 
-  socket.emit("message", "Welcome!"); // socket.emit emits to one client
-  socket.broadcast.emit("message", "A new user has joined!"); // socket.broadcast emits to all clients except original client
+  socket.on("join", ({ username, room }) => {
+    socket.join(room); // The join method can only be used on the server side - allows us to join a specific chatroom. The join method allows us to emit events to those in this specific chatroom only.
+
+    socket.emit("message", generateMessage("Welcome!"));
+    socket.broadcast
+      .to(room)
+      .emit("message", generateMessage(`${username} has joined!`));
+  });
 
   socket.on("sendMessage", (message, callback) => {
     const filter = new Filter(); // bad-words npm package; allows us to check for profanity, then send info back to client via callback
@@ -28,21 +35,23 @@ io.on("connection", (socket) => {
       return callback("Profanity is not allowed");
     }
 
-    io.emit("message", message); // io.emit emits to all connected clients
+    io.to("nyc").emit("message", generateMessage(message));
     callback(); // allowed to pass additional information via callback to the client (original emmitter)
   });
 
   socket.on("sendLocation", (coords, callback) => {
     io.emit(
-      "message",
-      `https://google.com/maps?q=${coords.latitude},${coords.longitude}`
+      "locationMessage",
+      generateLocationMessage(
+        `https://google.com/maps?q=${coords.latitude},${coords.longitude}`
+      )
     );
 
     callback();
   });
 
   socket.on("disconnect", () => {
-    io.emit("message", "A user has left!");
+    io.emit("message", generateMessage("A user has left!"));
   });
 });
 

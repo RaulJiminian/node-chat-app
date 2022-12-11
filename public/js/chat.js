@@ -1,11 +1,40 @@
-const socket = io(); // initializing socket.io connection on client side
+// Initializing socket.io connection on client side
+const socket = io();
+
+// Elements (querySelect'ed); the $ is convention for storing HTML elements
 const $form = document.querySelector("form");
 const $locationBtn = document.querySelector("#send-location");
+const $messages = document.querySelector("#messages");
 
-socket.on("message", (msg) => {
-  console.log(msg);
+// Templates
+const messageTemplate = document.querySelector("#message-template").innerHTML;
+const locationTemplate = document.querySelector("#location-template").innerHTML;
+
+// Options
+const { username, room } = Qs.parse(location.search, {
+  ignoreQueryPrefix: true,
 });
 
+// Socket listeners => communication coming in from the server side
+socket.on("message", (message) => {
+  console.log(message);
+  const html = Mustache.render(messageTemplate, {
+    message: message.text,
+    createdAt: moment(message.createdAt).format("h:mm a"),
+  });
+  $messages.insertAdjacentHTML("beforeend", html);
+});
+
+socket.on("locationMessage", (message) => {
+  // console.log(message);
+  const html = Mustache.render(locationTemplate, {
+    url: message.url,
+    createdAt: moment(message.createdAt).format("h:mm a"),
+  });
+  $messages.insertAdjacentHTML("beforeend", html);
+});
+
+// Event Listeners (form submit and button click)
 $form.addEventListener("submit", (e) => {
   e.preventDefault();
   const { message, subBtn } = e.target.elements; // extracting input (name=message) and submit button (name=subBtn) from form elements
@@ -52,3 +81,6 @@ $locationBtn.addEventListener("click", () => {
     );
   });
 });
+
+// Socket Emitters
+socket.emit("join", { username, room });
